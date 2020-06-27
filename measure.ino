@@ -2,61 +2,17 @@
 SWR / POWER METER + IC7300 C-IV CONTROLLER
 
 Swr/PowerMeter (basic) - https://github.com/GI8GZM/PowerSwrMeter
-Swr/PowerMeter + IC7300 C-IV Controller - https://github.com/GI8GZM/PowerSwrMeter
+Swr/PowerMeter + IC7300 C-IV Controller - https://github.com/GI8GZM/PowerMeter-CIVController
 
 © Copyright 2018-2020  Roger Mawhinney, GI8GZM.
 No publication without acknowledgement to author
 -------------------------------------------------------------------------------------*/
 
-
-/* -------------------------- netPwrProcess ------------------------------
-process net power - immediate fast attack, exponentailly decayed
-*/
-float netPwrProcess(float currPwr, float weight)
-{
-	static float prevPwr = 0;
-	float pwr = sigProcess(currPwr, prevPwr, weight);
-	prevPwr = pwr;
-	return pwr;
-}
-
-/* ------------------pkPwrProcess -----------------------------------
-process pkpower - immediate fast attack, exponentailly decayed
-*/
-float pkPwrProcess(float currPwr, float weight)
-{
-	static float prevPwr = 0;
-	float pwr = sigProcess(currPwr, prevPwr, weight);
-	prevPwr = pwr;
-	return pwr;
-}
-
-
-/*----------------- sigProcess --------------------------------------
-signal processing - fast attack, exponential decay
-weight controls decay
-*/
-
-float sigProcess(float currSig, float prevSig, float weight)
-{
-	float sig;
-	// rising power processing - fast attack - immediate step up to higher value and hold
-	if (currSig > prevSig)
-		sig = currSig;
-
-	// exponential decay
-	//if (currSig <= prevSig)
-	else
-		sig = weight * currSig + (1 - weight) * prevSig; // exponential decay
-	return sig;
-}
-
 /*--------------------------- measure() ------------------------------------------
    reads ADC values recorded by ADC using interrupt timer - getADC().
    calculates forward, reflected power, net power, peak envelope power
-   and peak power calculated and held for 3-4 secs
-   swr calculated from fwd and reflected power
-   Calls: pwrCalc(), displayValue(), restoreFrame(), resetDimmer()
+   and peak power
+   swr calculated from fwd and ref peak power
 */
 void measure()
 {
@@ -64,22 +20,17 @@ void measure()
 	float  fwdV, refV, fwdPkV, refPkV;									// calulated ADC voltages
 	float fwdPwr, refPwr, fwdPkPwr, refPkPwr;							// calculated powers
 	float netPwr, pep, dB, swr = 1.0;
-	static float netPwrHold = 0, pkPwr = 0;
-	//static float netPwrPkHold = 0;
-	//static float pepHold = 0;
+	static float pkPwr = 0;
 
-	float w = (float)optAvgWeight.val / 1000;								// weighting for exponential  smoothing
-
-	float adcConvert = 3.3 / adc->adc0->getMaxValue();					// 3.3 (max volts) / adc max value, varies with resolution+
 	static float fwdVPrev = 0, refVPrev = 0;							// variables for exponential smoothing
 	static float fwdPkVPrev = 0, refPkVPrev = 0;						// variables for exponential smoothing
 
+	float adcConvert = 3.3 / adc->adc0->getMaxValue();					// 3.3 (max volts) / adc max value, varies with resolution+
 
-	// set true for netPower display
+	// set true for netPower display (red b/ground)
 	lab[netPower].stat = true;
 
 	// main measuring / display loop
-	// do at least once
 	// continue while power > threshold
 	do
 	{
@@ -99,18 +50,14 @@ void measure()
 		fwdPkV = fPk * adcConvert + FV_ZEROADJ;
 		refPkV = rPk * adcConvert + RV_ZEROADJ;
 
-		float weight = (float)optAvgWeight.val/1000;
-		//// apply exponential voltages smoothing
-		//fwdV = w * fwdV + (1 - w) * fwdVPrev;
+		// apply exponential smoothing
+		float weight = (float)optAvgWeight.val / 1000;
 		fwdV = sigProcess(fwdV, fwdVPrev, weight);
 		fwdVPrev = fwdV;
-		//refV = w * refV + (1 - w) * refVPrev;
 		refV = sigProcess(refV, refVPrev, weight);
 		refVPrev = refV;
-		//fwdPkV = w * fwdPkV + (1 - w) * fwdPkVPrev;
 		fwdPkV = sigProcess(fwdPkV, fwdPkVPrev, weight);
 		fwdPkVPrev = fwdPkV;
-		//refPkV = w * refPkV + (1 - w) * refPkVPrev;
 		refPkV = sigProcess(refPkV, refPkVPrev, weight);
 		refPkVPrev = refPkV;
 
@@ -161,11 +108,11 @@ void measure()
 		if (dB < 0)
 			dB = 0.0;
 
+
 		// swr calculation - only calculate if power on. do not use netPwr as signal processed
-		// use power, not volts, as curve linearity compensated
-		// peak power preferred - stops SWR changes on power off
-		//if ((fwdPwr-refPwr)> PWR_THRESHOLD && fPk > rPk)
-		if (netPwr > PWR_THRESHOLD*10 && fwdPkPwr > refPkPwr)
+		// use power, not volts, as curve linearity already compensated
+		// peak power preferred - stops SWR changes on power off as netpower decreases
+		if (netPwr > PWR_THRESHOLD * 10 && fwdPkPwr > refPkPwr)
 		{
 			// reflection coefficient
 			float rc = sqrt(refPkPwr / fwdPkPwr);
@@ -206,26 +153,13 @@ void measure()
 			}
 		}
 
-
-
-		float test = (float)avgSamples / 100;
-		float decay = (float)avgSamples / 100 * optAvgWeight.val/1000;								// weight for exponential decay
-		// display all enabled frames
-		decay = .1;
-
-		//netPwr = netPwrProcess(netPwr, decay);
 		displayValue(netPower, netPwr);
-
 		displayValue(dBm, dB);
 		displayValue(peakPower, pkPwr);
 		displayValue(fwdPower, fwdPwr);
 		displayValue(refPower, refPwr);
 		displayValue(fwdVolts, fwdV);
 		displayValue(refVolts, refV);
-
-		//drawMeter(netPwrMeter, netPwr, pkPwr);
-		//drawMeter(netPwrMeter, netPwr, pkPwrProcess(pep, .1));
-		//drawMeter(netPwrMeter, netPwr, pkPwrProcess(pkPwr, .2));
 		drawMeter(netPwrMeter, netPwr, pkPwr);
 		drawMeter(swrMeter, swr, 1);
 
@@ -238,26 +172,21 @@ void measure()
 #endif
 
 		// check for dimmed screen and reset
-		//if (netPwr >= PWR_THRESHOLD && isDim)
 		if (netPwr >= PWR_THRESHOLD)
 			resetDimmer();
 
 		// check if screen has been touched
-		// netPower button can change samplesAvg during measure
 		if (ts.tirqTouched())
 			chkTouchFrame(NUM_FRAMES);
 
-
 		// ensure measure loop slower than getADC() sample frequency
-		// measure loop = 30microsecs
-		// delay(>5) millisecs
+		// measure loop = 30microsecs, delay(>5) millisecs
 		delay(5);
 
 		// do at least once and while power applied
 	} while (netPwr >= PWR_THRESHOLD);
 
 	// power off - display exit power
-	// change netPower to b/ground colour
 	if (fr[netPower].isEnable && !lab[netPower].stat)
 	{
 		fr[netPower].bgColour = BG_COLOUR;
@@ -273,26 +202,47 @@ calculates pwr in Watts directly from ADC volts
 applies constants from calibration procedure
 if CIV enabled, adjust for freq response of coupler
 */
-float pwrCalc(float v)						//
+float pwrCalc(float v)
 {
 	float pwr = 0.0;
 
-	// calculate power
-	{
-		if (v < FWD_V_SPLIT_PWR)							// low power below split (non-linear)
-			pwr = log(v) * FWD_LO_MULT_PWR + FWD_LO_ADD_PWR;
-		else
-			pwr = v * v * FWD_HI_MULT2_PWR + v * FWD_HI_MULT1_PWR + FWD_HI_ADD_PWR;		// high power
-	}
+	// low power below split (non-linear)
+	if (v < FWD_V_SPLIT_PWR)
+		pwr = log(v) * FWD_LO_MULT_PWR + FWD_LO_ADD_PWR;
+	else
+		// high power
+		pwr = v * v * FWD_HI_MULT2_PWR + v * FWD_HI_MULT1_PWR + FWD_HI_ADD_PWR;
 
-	if (pwr < 0 || !isnormal(pwr) || isnan(pwr))			// check for division by zero and < 0
+	// check for division by zero and < 0
+	if (pwr < 0 || !isnormal(pwr) || isnan(pwr))
 		pwr = 0.0;
 
-#ifdef CIV	// adjust power for freq response of coupler
+#ifdef CIV	
+	// adjust power for freq response of coupler
 	if (isCivEnable)
 		return (pwr * hfBand[currBand].pwrMult);			// return power (watts)
 	else
 #endif
 
 		return pwr;
+}
+
+
+/*----------------- sigProcess --------------------------------------
+signal processing - fast attack, exponential decay
+weight controls decay
+*/
+
+float sigProcess(float currSig, float prevSig, float weight)
+{
+	float sig;
+
+	if (currSig > prevSig)
+		// fast attack - immediate step up to higher value
+		sig = currSig;
+	else
+		// exponential decay
+		sig = weight * currSig + (1 - weight) * prevSig;
+
+	return sig;
 }

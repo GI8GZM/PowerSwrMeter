@@ -17,12 +17,12 @@
   <ItemGroup>
     <None Include="PowerSwrMeter.ino" />
     <None Include="adc.ino" />
-    <None Include="averagingOptions.ino" />
     <None Include="buttons.ino" />
     <None Include="display.ino" />
     <None Include="eeProm.ino" />
     <None Include="measure.ino" />
     <None Include="touch.ino" />
+    <None Include="options.ino" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.PowerSwrMeter.vsarduino.h">

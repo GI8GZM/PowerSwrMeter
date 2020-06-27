@@ -96,11 +96,11 @@ typedef unsigned long __uint32_t;
 
 #include "PowerSwrMeter.ino"
 #include "adc.ino"
-#include "averagingOptions.ino"
 #include "buttons.ino"
 #include "display.ino"
 #include "eeProm.ino"
 #include "measure.ino"
+#include "options.ino"
 #include "touch.ino"
 #endif
 #endif

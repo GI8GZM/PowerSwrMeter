@@ -1,9 +1,8 @@
 /*-----------------------------------------------------------------------------------
 SWR / POWER METER + IC7300 C-IV CONTROLLER
 
-
 Swr/PowerMeter (basic) - https://github.com/GI8GZM/PowerSwrMeter
-Swr/PowerMeter + IC7300 C-IV Controller - https://github.com/GI8GZM/PowerSwrMeter
+Swr/PowerMeter + IC7300 C-IV Controller - https://github.com/GI8GZM/PowerMeter-CIVController
 
 © Copyright 2018-2020  Roger Mawhinney, GI8GZM.
 No publication without acknowledgement to author
